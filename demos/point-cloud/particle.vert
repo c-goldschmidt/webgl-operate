@@ -10,7 +10,13 @@ precision lowp int;
     in vec3 a_vertex;
 #endif
 
+uniform mat4 u_view;
+uniform mat4 u_projection;
+
+
 void main()
 {
-	gl_Position = vec4(a_vertex, 1.0);
+    vec4 p = u_projection * u_view * vec4(a_vertex, 1.0);
+
+	gl_Position = p; //vec4(p, 1.0);
 }

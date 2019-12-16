@@ -36,9 +36,9 @@ export class PointCloudRenderer extends Renderer {
 
     protected _program: Program;
 
-    // protected _uView: WebGLUniformLocation;
+    protected _uView: WebGLUniformLocation;
     // protected _uViewInverse: WebGLUniformLocation;
-    // protected _uProjection: WebGLUniformLocation;
+    protected _uProjection: WebGLUniformLocation;
     // protected _uViewProjection: WebGLUniformLocation;
 
     protected _defaultFBO: DefaultFramebuffer;
@@ -64,7 +64,11 @@ export class PointCloudRenderer extends Renderer {
 
         // WORLD SPACE:
         const vertices = new Float32Array([
-            -0.5, -0.5, 0.0, /* UL */ +0.5, -0.5, 0.0, /* UR */ +0.5, +0.5, 0.0]);
+            -0.5, -0.5, 0.0,
+            +0.5, -0.5, 0.0,
+            +0.5, +0.5, 0.0,
+            -0.5, +0.5, 0.0]);
+
 
         const vertexLocation: GLuint = 0; // x, y, z positions in world space
 
@@ -83,6 +87,10 @@ export class PointCloudRenderer extends Renderer {
         this._program.initialize([vert, frag], false);
         this._program.attribute('a_vertex', vertexLocation);
         this._program.link();
+
+
+        this._uView = this._program.uniform("u_view");
+        this._uProjection = this._program.uniform("u_projection");
 
 
         this._camera = new Camera();
@@ -150,7 +158,10 @@ export class PointCloudRenderer extends Renderer {
         this._program.bind();
         this._vertexVBO.bind();
 
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.uniformMatrix4fv(this._uView, false, this._camera.view);
+        gl.uniformMatrix4fv(this._uProjection, false, this._camera.projection);
+
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
         this._vertexVBO.unbind();
         this._program.unbind();
