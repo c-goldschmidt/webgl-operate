@@ -34,10 +34,12 @@ export class PointCloudRenderer extends Renderer {
     protected _vertexVBO: Buffer;
     // protected _pointCount: number;
 
+    protected _pointCount: number;
+
     protected _program: Program;
 
     protected _uView: WebGLUniformLocation;
-    // protected _uViewInverse: WebGLUniformLocation;
+    protected _uViewInverse: WebGLUniformLocation;
     protected _uProjection: WebGLUniformLocation;
     // protected _uViewProjection: WebGLUniformLocation;
 
@@ -64,18 +66,46 @@ export class PointCloudRenderer extends Renderer {
 
         // WORLD SPACE:
         const vertices = new Float32Array([
-            -0.5, -0.5, 0.0,
-            +0.5, -0.5, 0.0,
-            +0.5, +0.5, 0.0,
-            -0.5, +0.5, 0.0]);
+            -0.5, -0.5, 0.0, -1.0, -1.0,
+            +0.5, -0.5, 0.0, +1.0, -1.0,
+            +0.5, +0.5, 0.0, +1.0, +1.0,
+            -0.5, -0.5, 0.0, -1.0, -1.0,
+            +0.5, +0.5, 0.0, +1.0, +1.0,
+            -0.5, +0.5, 0.0, -1.0, +1.0]);
 
+        this._pointCount = 1e5;
+        const particles = new Float32Array(this._pointCount * vertices.length);
+        // x * 0.2 * 8.0 - 4  1.6 - 5  -> 0.8
+        // i0 = 0 * 3 * 4  = 0
+        // j = 0  -> [0 + 0 + 0] = x + - 0.5;
+        //           [0 + 0 + 1] = y + - 0.5;
+
+        for (let i = 0; i < this._pointCount; ++i) {
+
+            const x = Math.random() * 2.0 - 1.0;
+            const y = Math.random() * 2.0 - 1.0;
+            const z = Math.random() * 2.0 - 1.0;
+
+            const i0 = i * vertices.length;
+            for (let j = 0; j < vertices.length; j += 5) {
+                particles[i0 + j + 0] = x + vertices[j + 0]; // x
+                particles[i0 + j + 1] = y + vertices[j + 1]; // y
+                particles[i0 + j + 2] = z + vertices[j + 2]; // z
+                particles[i0 + j + 3] = vertices[j + 3]; // u
+                particles[i0 + j + 4] = vertices[j + 4]; // v
+            }
+        }
+
+        console.log(particles);
 
         const vertexLocation: GLuint = 0; // x, y, z positions in world space
+        const uvLocation: GLuint = 1; // u, v
 
         this._vertexVBO = new Buffer(context, 'positionsVBO');
         this._vertexVBO.initialize(gl.ARRAY_BUFFER);
-        this._vertexVBO.attribEnable(vertexLocation, 3, gl.FLOAT, false);
-        this._vertexVBO.data(vertices, gl.STATIC_DRAW);
+        this._vertexVBO.attribEnable(vertexLocation, 3, gl.FLOAT, false, 5 * 4, 0 * 4);
+        this._vertexVBO.attribEnable(uvLocation, 2, gl.FLOAT, false, 5 * 4, 3 * 4);
+        this._vertexVBO.data(particles, gl.STATIC_DRAW);
 
 
         const vert = new Shader(context, gl.VERTEX_SHADER, 'particle.vert');
@@ -90,6 +120,7 @@ export class PointCloudRenderer extends Renderer {
 
 
         this._uView = this._program.uniform("u_view");
+        this._uViewInverse = this._program.uniform("u_viewInverse");
         this._uProjection = this._program.uniform("u_projection");
 
 
@@ -104,6 +135,8 @@ export class PointCloudRenderer extends Renderer {
 
         this._navigation = new Navigation(callback, mouseEventProvider);
         this._navigation.camera = this._camera;
+
+        gl.enable(gl.DEPTH_TEST);
 
         return true;
     }
@@ -159,9 +192,11 @@ export class PointCloudRenderer extends Renderer {
         this._vertexVBO.bind();
 
         gl.uniformMatrix4fv(this._uView, false, this._camera.view);
+        gl.uniformMatrix4fv(this._uViewInverse, false, this._camera.viewInverse);
         gl.uniformMatrix4fv(this._uProjection, false, this._camera.projection);
 
-        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+        //gl.pointSize(10.0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6 * this._pointCount);
 
         this._vertexVBO.unbind();
         this._program.unbind();
